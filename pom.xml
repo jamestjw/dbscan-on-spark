@@ -30,10 +30,10 @@
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-		<scala.version>2.10.4</scala.version>
-		<scala.binary.version>2.10</scala.binary.version>
-		<scalatest.version>2.2.1</scalatest.version>
-		<spark.version>2.1.0</spark.version>
+		<scala.version>2.13.8</scala.version>
+		<scalatest.version>3.2.12</scalatest.version>
+		<scala.binary.version>2.13</scala.binary.version>
+		<spark.version>3.3.0</spark.version>
 	</properties>
 
 	<repositories>
@@ -53,7 +53,7 @@
 		<repository>
 			<id>archery-repo</id>
 			<name>Repo for Archery R-Tree</name>
-			<url>http://dl.bintray.com/meetup/maven</url>
+			<url>https://repo.spring.io/ui/native/plugins-release/</url>
 		</repository>
 	</repositories>
 
@@ -86,7 +86,7 @@
 			<plugin>
 				<groupId>net.alchim31.maven</groupId>
 				<artifactId>scala-maven-plugin</artifactId>
-				<version>3.2.0</version>
+				<version>4.7.1</version>
 				<executions>
 					<execution>
 						<goals>
