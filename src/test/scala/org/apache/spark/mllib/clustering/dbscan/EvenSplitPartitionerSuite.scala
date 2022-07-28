@@ -16,10 +16,10 @@
  */
 package org.apache.spark.mllib.clustering.dbscan
 
-import org.scalatest.FunSuite
-import org.scalatest.Matchers
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should._
 
-class EvenSplitPartitionerSuite extends FunSuite with Matchers {
+class EvenSplitPartitionerSuite extends AnyFunSuite with Matchers {
   test("should find partitions") {
 
     val section1 = (DBSCANRectangle(0, 0, 1, 1), 3)

@@ -50,11 +50,6 @@
 				<enabled>false</enabled>
 			</snapshots>
 		</repository>
-		<repository>
-			<id>archery-repo</id>
-			<name>Repo for Archery R-Tree</name>
-			<url>https://repo.spring.io/ui/native/plugins-release/</url>
-		</repository>
 	</repositories>
 
 	<dependencies>
@@ -67,11 +62,6 @@
 			<groupId>org.apache.spark</groupId>
 			<artifactId>spark-mllib_${scala.binary.version}</artifactId>
 			<version>${spark.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>com.meetup</groupId>
-			<artifactId>archery_${scala.binary.version}</artifactId>
-			<version>0.3.0</version>
 		</dependency>
 		<dependency>
 			<groupId>org.scalatest</groupId>

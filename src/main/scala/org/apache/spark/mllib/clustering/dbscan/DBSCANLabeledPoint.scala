@@ -18,9 +18,8 @@ package org.apache.spark.mllib.clustering.dbscan
 
 import org.apache.spark.mllib.linalg.Vector
 
-/**
- * Companion constants for labeled points
- */
+/** Companion constants for labeled points
+  */
 object DBSCANLabeledPoint {
 
   val Unknown = 0

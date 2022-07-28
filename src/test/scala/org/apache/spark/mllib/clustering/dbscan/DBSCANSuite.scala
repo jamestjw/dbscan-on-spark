@@ -19,13 +19,17 @@ package org.apache.spark.mllib.clustering.dbscan
 import org.apache.spark.rdd.PairRDDFunctions
 import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.mllib.util.MLlibTestSparkContext
-import org.scalatest.Matchers
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should._
 
-class DBSCANSuite extends LocalDBSCANArcherySuite with MLlibTestSparkContext with Matchers {
+import scala.io.Source
+import java.net.URI
+
+class DBSCANSuite extends AnyFunSuite with MLlibTestSparkContext with Matchers {
 
   private val dataFile = "labeled_data.csv"
 
-  private val corresponding = Map(3 -> 2D, 2 -> 1D, 1 -> 3D, 0 -> 0D)
+  private val corresponding = Map(3 -> 2d, 2 -> 1d, 1 -> 3d, 0 -> 0d)
 
   test("dbscan") {
 
@@ -33,8 +37,12 @@ class DBSCANSuite extends LocalDBSCANArcherySuite with MLlibTestSparkContext wit
 
     val parsedData = data.map(s => Vectors.dense(s.split(',').map(_.toDouble)))
 
-    val model = DBSCAN.train(parsedData, eps = 0.3F, minPoints = 10, maxPointsPerPartition = 250)
-    
+    val model = DBSCAN.train(
+      parsedData,
+      eps = 0.3f,
+      minPoints = 10,
+      maxPointsPerPartition = 250
+    )
 
     val clustered = model.labeledPoints
       .map(p => (p, p.cluster))
@@ -48,15 +56,31 @@ class DBSCANSuite extends LocalDBSCANArcherySuite with MLlibTestSparkContext wit
     clustered.foreach {
       case (key, value) => {
         val t = expected(key)
-        if (t != value) {
-          println(s"expected: $t but got $value for $key")
-        }
-
+        value should equal(t)
       }
     }
-
-    clustered should equal(expected)
-
   }
 
+  def getExpectedData(file: String): Iterator[(DBSCANPoint, Double)] = {
+    Source
+      .fromFile(getFile(file))
+      .getLines()
+      .map(s => {
+        val vector = Vectors.dense(s.split(',').map(_.toDouble))
+        val point = DBSCANPoint(vector)
+        (point, vector(2))
+      })
+  }
+
+  def getRawData(file: String): Iterable[DBSCANPoint] = {
+    Source
+      .fromFile(getFile(file))
+      .getLines()
+      .map(s => DBSCANPoint(Vectors.dense(s.split(',').map(_.toDouble))))
+      .toIterable
+  }
+
+  def getFile(filename: String): URI = {
+    getClass.getClassLoader.getResource(filename).toURI
+  }
 }

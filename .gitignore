@@ -5,3 +5,7 @@ target/
 .settings
 .project
 /bin/
+.bloop/
+.metals/
+.scalafmt.conf
+.vscode/

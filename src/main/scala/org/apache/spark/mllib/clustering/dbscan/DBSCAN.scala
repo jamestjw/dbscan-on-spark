@@ -22,26 +22,29 @@ import org.apache.spark.mllib.clustering.dbscan.DBSCANLabeledPoint.Flag
 import org.apache.spark.mllib.linalg.Vector
 import org.apache.spark.rdd.RDD
 
-/**
- * Top level method for calling DBSCAN
- */
+/** Top level method for calling DBSCAN
+  */
 object DBSCAN {
 
-  /**
-   * Train a DBSCAN Model using the given set of parameters
-   *
-   * @param data training points stored as `RDD[Vector]`
-   * only the first two points of the vector are taken into consideration
-   * @param eps the maximum distance between two points for them to be considered as part
-   * of the same region
-   * @param minPoints the minimum number of points required to form a dense region
-   * @param maxPointsPerPartition the largest number of points in a single partition
-   */
+  /** Train a DBSCAN Model using the given set of parameters
+    *
+    * @param data
+    *   training points stored as `RDD[Vector]` only the first two points of the
+    *   vector are taken into consideration
+    * @param eps
+    *   the maximum distance between two points for them to be considered as
+    *   part of the same region
+    * @param minPoints
+    *   the minimum number of points required to form a dense region
+    * @param maxPointsPerPartition
+    *   the largest number of points in a single partition
+    */
   def train(
-    data: RDD[Vector],
-    eps: Double,
-    minPoints: Int,
-    maxPointsPerPartition: Int): DBSCAN = {
+      data: RDD[Vector],
+      eps: Double,
+      minPoints: Int,
+      maxPointsPerPartition: Int
+  ): DBSCAN = {
 
     new DBSCAN(eps, minPoints, maxPointsPerPartition, null, null).train(data)
 
@@ -49,24 +52,26 @@ object DBSCAN {
 
 }
 
-/**
- * A parallel implementation of DBSCAN clustering. The implementation will split the data space
- * into a number of partitions, making a best effort to keep the number of points in each
- *  partition under `maxPointsPerPartition`. After partitioning, traditional DBSCAN
- *  clustering will be run in parallel for each partition and finally the results
- *  of each partition will be merged to identify global clusters.
- *
- *  This is an iterative algorithm that will make multiple passes over the data,
- *  any given RDDs should be cached by the user.
- */
+/** A parallel implementation of DBSCAN clustering. The implementation will
+  * split the data space into a number of partitions, making a best effort to
+  * keep the number of points in each partition under `maxPointsPerPartition`.
+  * After partitioning, traditional DBSCAN clustering will be run in parallel
+  * for each partition and finally the results of each partition will be merged
+  * to identify global clusters.
+  *
+  * This is an iterative algorithm that will make multiple passes over the data,
+  * any given RDDs should be cached by the user.
+  */
 class DBSCAN private (
-  val eps: Double,
-  val minPoints: Int,
-  val maxPointsPerPartition: Int,
-  @transient val partitions: List[(Int, DBSCANRectangle)],
-  @transient private val labeledPartitionedPoints: RDD[(Int, DBSCANLabeledPoint)])
-
-  extends Serializable with Logging {
+    val eps: Double,
+    val minPoints: Int,
+    val maxPointsPerPartition: Int,
+    @transient val partitions: List[(Int, DBSCANRectangle)],
+    @transient private val labeledPartitionedPoints: RDD[
+      (Int, DBSCANLabeledPoint)
+    ]
+) extends Serializable
+    with Logging {
 
   type Margins = (DBSCANRectangle, DBSCANRectangle, DBSCANRectangle)
   type ClusterId = (Int, Int)
@@ -91,7 +96,11 @@ class DBSCAN private (
 
     // find the best partitions for the data space
     val localPartitions = EvenSplitPartitioner
-      .partition(minimumRectanglesWithCount, maxPointsPerPartition, minimumRectangleSize)
+      .partition(
+        minimumRectanglesWithCount,
+        maxPointsPerPartition,
+        minimumRectangleSize
+      )
 
     logDebug("Found partitions: ")
     localPartitions.foreach(p => logDebug(p.toString))
@@ -118,21 +127,21 @@ class DBSCAN private (
       duplicated
         .groupByKey(numOfPartitions)
         .flatMapValues(points =>
-          new LocalDBSCANNaive(eps, minPoints).fit(points))
+          new LocalDBSCANNaive(eps, minPoints).fit(points)
+        )
         .cache()
 
     // find all candidate points for merging clusters and group them
     val mergePoints =
       clustered
-        .flatMap({
-          case (partition, point) =>
-            margins.value
-              .filter({
-                case ((inner, main, _), _) => main.contains(point) && !inner.almostContains(point)
-              })
-              .map({
-                case (_, newPartition) => (newPartition, (partition, point))
-              })
+        .flatMap({ case (partition, point) =>
+          margins.value
+            .filter({ case ((inner, main, _), _) =>
+              main.contains(point) && !inner.almostContains(point)
+            })
+            .map({ case (_, newPartition) =>
+              (newPartition, (partition, point))
+            })
         })
         .groupByKey()
 
@@ -160,23 +169,25 @@ class DBSCAN private (
         .toList
 
     // assign a global Id to all clusters, where connected clusters get the same id
-    val (total, clusterIdToGlobalId) = localClusterIds.foldLeft((0, Map[ClusterId, Int]())) {
-      case ((id, map), clusterId) => {
+    val (total, clusterIdToGlobalId) =
+      localClusterIds.foldLeft((0, Map[ClusterId, Int]())) {
+        case ((id, map), clusterId) => {
 
-        map.get(clusterId) match {
-          case None => {
-            val nextId = id + 1
-            val connectedClusters = adjacencyGraph.getConnected(clusterId) + clusterId
-            logDebug(s"Connected clusters $connectedClusters")
-            val toadd = connectedClusters.map((_, nextId)).toMap
-            (nextId, map ++ toadd)
+          map.get(clusterId) match {
+            case None => {
+              val nextId = id + 1
+              val connectedClusters =
+                adjacencyGraph.getConnected(clusterId) + clusterId
+              logDebug(s"Connected clusters $connectedClusters")
+              val toadd = connectedClusters.map((_, nextId)).toMap
+              (nextId, map ++ toadd)
+            }
+            case Some(x) =>
+              (id, map)
           }
-          case Some(x) =>
-            (id, map)
-        }
 
+        }
       }
-    }
 
     logDebug("Global Clusters")
     clusterIdToGlobalId.foreach(e => logDebug(e.toString))
@@ -204,30 +215,31 @@ class DBSCAN private (
     // de-duplicate and label merge points
     val labeledOuter =
       mergePoints.flatMapValues(partition => {
-        partition.foldLeft(Map[DBSCANPoint, DBSCANLabeledPoint]())({
-          case (all, (partition, point)) =>
-
-            if (point.flag != Flag.Noise) {
-              point.cluster = clusterIds.value((partition, point.cluster))
-            }
-
-            all.get(point) match {
-              case None => all + (point -> point)
-              case Some(prev) => {
-                // override previous entry unless new entry is noise
-                if (point.flag != Flag.Noise) {
-                  prev.flag = point.flag
-                  prev.cluster = point.cluster
-                }
-                all
+        partition
+          .foldLeft(Map[DBSCANPoint, DBSCANLabeledPoint]())({
+            case (all, (partition, point)) =>
+              if (point.flag != Flag.Noise) {
+                point.cluster = clusterIds.value((partition, point.cluster))
               }
-            }
 
-        }).values
+              all.get(point) match {
+                case None => all + (point -> point)
+                case Some(prev) => {
+                  // override previous entry unless new entry is noise
+                  if (point.flag != Flag.Noise) {
+                    prev.flag = point.flag
+                    prev.cluster = point.cluster
+                  }
+                  all
+                }
+              }
+
+          })
+          .values
       })
 
-    val finalPartitions = localMargins.map {
-      case ((_, p, _), index) => (index, p)
+    val finalPartitions = localMargins.map { case ((_, p, _), index) =>
+      (index, p)
     }
 
     logDebug("Done")
@@ -237,41 +249,44 @@ class DBSCAN private (
       minPoints,
       maxPointsPerPartition,
       finalPartitions,
-      labeledInner.union(labeledOuter))
+      labeledInner.union(labeledOuter)
+    )
 
   }
 
-  /**
-   * Find the appropriate label to the given `vector`
-   *
-   * This method is not yet implemented
-   */
+  /** Find the appropriate label to the given `vector`
+    *
+    * This method is not yet implemented
+    */
   def predict(vector: Vector): DBSCANLabeledPoint = {
     throw new NotImplementedError
   }
 
   private def isInnerPoint(
-    entry: (Int, DBSCANLabeledPoint),
-    margins: List[(Margins, Int)]): Boolean = {
+      entry: (Int, DBSCANLabeledPoint),
+      margins: List[(Margins, Int)]
+  ): Boolean = {
     entry match {
       case (partition, point) =>
-        val ((inner, _, _), _) = margins.filter({
-          case (_, id) => id == partition
-        }).head
+        val ((inner, _, _), _) = margins
+          .filter({ case (_, id) =>
+            id == partition
+          })
+          .head
 
         inner.almostContains(point)
     }
   }
 
   private def findAdjacencies(
-    partition: Iterable[(Int, DBSCANLabeledPoint)]): Set[((Int, Int), (Int, Int))] = {
+      partition: Iterable[(Int, DBSCANLabeledPoint)]
+  ): Set[((Int, Int), (Int, Int))] = {
 
     val zero = (Map[DBSCANPoint, ClusterId](), Set[(ClusterId, ClusterId)]())
 
     val (seen, adjacencies) = partition.foldLeft(zero)({
 
       case ((seen, adjacencies), (partition, point)) =>
-
         // noise points are not relevant for adjacencies
         if (point.flag == Flag.Noise) {
           (seen, adjacencies)
@@ -280,8 +295,9 @@ class DBSCAN private (
           val clusterId = (partition, point.cluster)
 
           seen.get(point) match {
-            case None                => (seen + (point -> clusterId), adjacencies)
-            case Some(prevClusterId) => (seen, adjacencies + ((prevClusterId, clusterId)))
+            case None => (seen + (point -> clusterId), adjacencies)
+            case Some(prevClusterId) =>
+              (seen, adjacencies + ((prevClusterId, clusterId)))
           }
 
         }
